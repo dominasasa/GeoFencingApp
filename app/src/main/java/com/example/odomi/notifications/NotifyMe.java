@@ -1,8 +1,10 @@
 package com.example.odomi.notifications;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -18,9 +20,15 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -30,6 +38,7 @@ import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -38,10 +47,15 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.mindorks.placeholderview.PlaceHolderView;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import static java.lang.Integer.parseInt;
 
 
 public class NotifyMe extends FragmentActivity implements
@@ -54,10 +68,17 @@ public class NotifyMe extends FragmentActivity implements
         ResultCallback<Status> {
 
     private GoogleMap mMap;
-    EditText searchView1;
+    AutoCompleteTextView searchView1;
     GoogleApiClient client;
 
     private Location lastLocation;
+
+    List<Geofence> geofenceList = new ArrayList<Geofence>();
+    List<Marker> geofenceMarkerList = new ArrayList<Marker>();
+
+
+    private PlaceAutocompleteAdapter placeAutocompleteAdapter;
+    private static LatLngBounds latLngBounds = new LatLngBounds(new LatLng(-40, -168), new LatLng(71, 136));
 
 
     @Override
@@ -69,11 +90,23 @@ public class NotifyMe extends FragmentActivity implements
 
         searchView1 = findViewById(R.id.searchView1);
 
+
         SetupMapFragment();
 
         StartGoogleApi();
 
+        GoogleApiClient dataClient = new GoogleApiClient.Builder(this)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .enableAutoManage(this, this)
+                .build();
+
+
+        placeAutocompleteAdapter = new PlaceAutocompleteAdapter(this, dataClient, latLngBounds, null);
+
+        searchView1.setAdapter(placeAutocompleteAdapter);
     }
+
 
     @Override
     protected void onStart() {
@@ -86,6 +119,21 @@ public class NotifyMe extends FragmentActivity implements
     @Override
     protected void onStop() {
         super.onStop();
+
+        for (Geofence geofence : geofenceList) {
+
+            List<String> geofenceID = new ArrayList<String>();
+            geofenceID.add(geofence.getRequestId());
+            geofenceList.remove(geofence);
+            LocationServices.GeofencingApi.removeGeofences(client, geofenceID);
+
+        }
+
+        geofenceMarkerList.clear();
+        geofenceList.clear();
+        circleList.clear();
+
+
 
         // Disconnect GoogleApiClient when stopping Activity
         client.disconnect();
@@ -213,7 +261,7 @@ public class NotifyMe extends FragmentActivity implements
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         getLastKnownLocation();
-        recoverGeofenceMarker();
+        //recoverGeofenceMarker();
     }
 
     private void getLastKnownLocation() {
@@ -247,6 +295,26 @@ public class NotifyMe extends FragmentActivity implements
     //region MapCallbacks
     @Override
     public boolean onMarkerClick(Marker marker) {
+        for (Geofence geofence : geofenceList) {
+            if (geofence.getRequestId() == marker.getTag().toString()) {
+                List<String> geofenceID = new ArrayList<String>();
+                geofenceID.add(geofence.getRequestId());
+                geofenceList.remove(geofence);
+                LocationServices.GeofencingApi.removeGeofences(client, geofenceID);
+
+            }
+        }
+
+        for (Circle circle : circleList) {
+            if (circle.getTag().toString() == marker.getTag().toString()) {
+                circleList.remove(circle);
+                circle.remove();
+            }
+
+        }
+        geofenceMarkerList.remove(marker);
+        marker.remove();
+
         return false;
     }
 
@@ -309,25 +377,61 @@ public class NotifyMe extends FragmentActivity implements
     private final String KEY_GEOFENCE_LON = "GEOFENCE LONGITUDE";
     Circle geofenceLimit;
     Marker geofenceMarker;
+    private String m_Text = "";
+    private int m_Int = 0;
+    private List<Circle> circleList = new ArrayList<Circle>();
 
     public void StartGeofencing(View v) {
-        if (geofenceMarker != null) {
+
+        LayoutInflater factory = LayoutInflater.from(this);
+
+//text_entry is an Layout XML file containing two text field to display in alert dialog
+        final View textEntryView = factory.inflate(R.layout.text_entry, null);
+
+        final EditText input1 = (EditText) textEntryView.findViewById(R.id.EditText1);
+        final EditText input2 = (EditText) textEntryView.findViewById(R.id.EditText2);
 
 
-            if (geofenceMarker != null) {
-                Geofence geofence = createGeofence(geofenceMarker.getPosition(), 250);
-                GeofencingRequest geofenceRequest = createGeofenceRequest(geofence);
-                addGeofence(geofenceRequest);
-            } else {
+        input1.setText("FenceID", TextView.BufferType.EDITABLE);
+        input2.setText("Radius", TextView.BufferType.EDITABLE);
 
-            }
-        }
+        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setTitle("Enter geofence parameters").setView(textEntryView).setPositiveButton("Save",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog,
+                                        int whichButton) {
+                        m_Text = input1.getText().toString();
+                        m_Int = parseInt(input2.getText().toString());
+
+
+                        if (geofenceMarkerList.get(geofenceMarkerList.size() - 1) != null) {
+                            Geofence geofence = createGeofence(m_Text, geofenceMarkerList.get(geofenceMarkerList.size() - 1).getPosition(), m_Int);
+                            geofenceList.add(geofence);
+                            geofenceMarkerList.get(geofenceMarkerList.size() - 1).setTag(m_Text);
+                            GeofencingRequest geofenceRequest = createGeofenceRequest(geofence);
+                            addGeofence(geofenceRequest);
+                        } else {
+
+                        }
+
+                    }
+                }).setNegativeButton("Cancel",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog,
+                                        int whichButton) {
+                        /*
+                         * User clicked cancel so do some stuff
+                         */
+                    }
+                });
+        alert.show();
+
     }
 
-    private Geofence createGeofence(LatLng latLng, float radius) {
+    private Geofence createGeofence(String requestID, LatLng latLng, float radius) {
 
         return new Geofence.Builder()
-                .setRequestId("Ola's fence")
+                .setRequestId(requestID)
                 .setCircularRegion(latLng.latitude, latLng.longitude, radius)
                 .setExpirationDuration(-1)
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER
@@ -379,22 +483,24 @@ public class NotifyMe extends FragmentActivity implements
         SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
 
-        editor.putLong(KEY_GEOFENCE_LAT, Double.doubleToRawLongBits(geofenceMarker.getPosition().latitude));
-        editor.putLong(KEY_GEOFENCE_LON, Double.doubleToRawLongBits(geofenceMarker.getPosition().longitude));
+        editor.putLong(KEY_GEOFENCE_LAT, Double.doubleToRawLongBits(geofenceMarkerList.get(geofenceMarkerList.size() - 1).getPosition().latitude));
+        editor.putLong(KEY_GEOFENCE_LON, Double.doubleToRawLongBits(geofenceMarkerList.get(geofenceMarkerList.size() - 1).getPosition().longitude));
         editor.apply();
     }
 
     private void drawGeofence() {
-        if (geofenceLimit != null) {
-            geofenceLimit.remove();
-        }
 
         CircleOptions circleOptions = new CircleOptions()
-                .center(geofenceMarker.getPosition())
+                .center(geofenceMarkerList.get(geofenceMarkerList.size() - 1).getPosition())
                 .strokeColor(Color.argb(50, 70, 70, 70))
                 .fillColor(Color.argb(100, 150, 150, 150))
-                .radius(250);
-        geofenceLimit = mMap.addCircle(circleOptions);
+                .radius(m_Int);
+
+
+        Circle circle = mMap.addCircle(circleOptions);
+        circle.setTag(geofenceMarkerList.get(geofenceMarkerList.size() - 1).getTag().toString());
+
+        circleList.add(circle);
     }
 
     private void markerForGeofence(LatLng latLng) {
@@ -402,11 +508,9 @@ public class NotifyMe extends FragmentActivity implements
                 = new MarkerOptions().position(latLng).title("Geofence marker");
 
         if (mMap != null) {
-            if (geofenceMarker != null) {
-                geofenceMarker.remove();
 
-            }
             geofenceMarker = mMap.addMarker(markerOptions);
+            geofenceMarkerList.add(geofenceMarker);
         }
     }
 
@@ -428,12 +532,6 @@ public class NotifyMe extends FragmentActivity implements
     public void onLocationChanged(Location location) {
         lastLocation = location;
     }
-
-
-
-
-
-
 
 
 }

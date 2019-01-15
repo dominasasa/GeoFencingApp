@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Notifications</string>
     <string name="title_activity_notify_me">Map</string>
+    <string name="home">Home</string>
+    <string name="open_drawer">Open</string>
+    <string name="close_drawer">Open</string>
 </resources>

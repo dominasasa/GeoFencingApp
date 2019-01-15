@@ -2,7 +2,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.google_map.MainActivity" >
+    tools:context="com.example.odomi.notifications.NotifyMe" >
 
     <fragment
         android:id="@+id/map"
@@ -14,32 +14,34 @@
         android:layout_marginLeft="0dp"
         android:layout_marginTop="0dp" />
 
-    <EditText
+    <AutoCompleteTextView
         android:id="@+id/searchView1"
-        android:layout_width="285dp"
-        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_height="22dp"
         android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
-        android:layout_marginLeft="18dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginEnd="7dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="17dp"
         android:layout_toStartOf="@+id/button1"
-        android:background="@android:color/white"
+        android:background="@drawable/rounded_edit_text"
         android:hint="Search Location"
-        android:textColor="@android:color/black"></EditText>
+        android:textAppearance="@android:style/Widget.Material.AutoCompleteTextView"
+        android:textColor="@android:color/black"
+        tools:theme="@android:style/Widget.Material.AutoCompleteTextView"></AutoCompleteTextView>
 
     <Button
         android:id="@+id/button1"
         android:layout_width="wrap_content"
-        android:layout_height="35dp"
+        android:layout_height="32dp"
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="9dp"
-        android:layout_marginEnd="4dp"
+        android:layout_marginTop="11dp"
+        android:layout_marginEnd="15dp"
+        android:autoText="true"
         android:onClick="onClick"
         android:text="Search"
         android:textAlignment="center"
-        android:textSize="12sp" />
+        android:textSize="9sp" />
 
     <Button
         android:id="@+id/button"
